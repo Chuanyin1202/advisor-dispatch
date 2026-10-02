@@ -1,0 +1,12 @@
+{
+  "name": "advisor-dispatch",
+  "description": "Advisor/dispatch workflow for Claude Code: one session plans and reviews, subagents build in isolated git worktrees, nothing merges without an evidence table.",
+  "version": "1.2.0",
+  "author": {
+    "name": "Chuanyin1202"
+  },
+  "homepage": "https://github.com/Chuanyin1202/advisor-dispatch",
+  "repository": "https://github.com/Chuanyin1202/advisor-dispatch",
+  "license": "MIT",
+  "keywords": ["skills", "subagents", "git-worktree", "workflow", "code-review"]
+}

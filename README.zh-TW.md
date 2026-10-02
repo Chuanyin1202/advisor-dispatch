@@ -3,10 +3,10 @@
 > 一個 session 負責規劃與審查，subagent 各自在獨立的 git worktree 裡實作。沒有證據就不能 merge。
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-v1.1.1-informational)](#)
+[![version](https://img.shields.io/badge/version-v1.2.0-informational)](#)
 
 - English：[README.md](README.md)
-- 核心流程（Claude Code 實際載入的檔案）：[`advisor-dispatch/SKILL.md`](advisor-dispatch/SKILL.md)
+- 核心流程（Claude Code 實際載入的檔案）：[`skills/advisor-dispatch/SKILL.md`](skills/advisor-dispatch/SKILL.md)
 
 ---
 
@@ -93,16 +93,24 @@ flowchart TD
 
 ```bash
 # 個人全域
-mkdir -p ~/.claude/skills && cp -R advisor-dispatch ~/.claude/skills/
+mkdir -p ~/.claude/skills && cp -R skills/advisor-dispatch ~/.claude/skills/
 # 或只給某個專案
-mkdir -p <專案>/.claude/skills && cp -R advisor-dispatch <專案>/.claude/skills/
+mkdir -p <專案>/.claude/skills && cp -R skills/advisor-dispatch <專案>/.claude/skills/
 ```
 
 skill 就是一個含 `SKILL.md` 的資料夾：不需要 manifest 或 marketplace，也能直接改成自己的慣例
 （commit 格式、測試指令）。重開 Claude Code session 後，用描述觸發，例如說「幫我派工做這件事」。
 
-**B. 包成 plugin**：適合發給很多人並做版本更新，但需要 plugin manifest 與 marketplace。
-本 repo 兩者都沒附，plugin 安裝也**未測試**。
+**B. Plugin（用指令安裝與更新）**
+
+```
+/plugin marketplace add Chuanyin1202/advisor-dispatch
+/plugin install advisor-dispatch@advisor-dispatch
+```
+
+`claude plugin validate` 對 plugin manifest、marketplace manifest 與 skill 都通過，
+並且已用本機 checkout 在乾淨的 Claude Code config 目錄裡安裝成功。**未測試**：
+在互動 session 裡從 GitHub 來源安裝，以及從 plugin 安裝後觸發 skill。
 
 ---
 
@@ -116,8 +124,8 @@ skill 就是一個含 `SKILL.md` 的資料夾：不需要 manifest 或 marketpla
 advisor 先產計畫與工單表，等你同意後記 base SHA、同一則訊息派出各單、巡視、收證據表、
 逐單 review 並複驗、依序 merge，最後問你能不能 push。
 
-範本：[`templates/ticket.md`](advisor-dispatch/templates/ticket.md)、
-[`templates/evidence-table.md`](advisor-dispatch/templates/evidence-table.md)。
+範本：[`templates/ticket.md`](skills/advisor-dispatch/templates/ticket.md)、
+[`templates/evidence-table.md`](skills/advisor-dispatch/templates/evidence-table.md)。
 
 ---
 
@@ -162,7 +170,7 @@ ticket-2 merged (8b7a54eb7039f1e7ed4e1a8d00d99709d174c47e); full suite 8 tests O
 **未來工作**
 
 1. 在真實的多工單任務上跑修正迴圈、巡視與 verifier。
-2. plugin 安裝流程測試通過後，包成 plugin。
+2. 測試從 GitHub 來源安裝 plugin，以及 plugin 安裝後 skill 的觸發。
 3. 用選用的 hook 強制最便宜的紅線（未經同意不得 push）。
 
 ---
@@ -170,7 +178,8 @@ ticket-2 merged (8b7a54eb7039f1e7ed4e1a8d00d99709d174c47e); full suite 8 tests O
 ## Repo 結構
 
 ```
-advisor-dispatch/
+.claude-plugin/                plugin.json, marketplace.json
+skills/advisor-dispatch/
 ├── SKILL.md                    核心流程（Claude Code 實際載入）
 ├── references/
 │   ├── evidence-table.md       證據規則與「結構相依」例外

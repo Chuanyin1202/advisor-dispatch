@@ -3,10 +3,10 @@
 > One session plans and reviews. Subagents build, each in its own git worktree. Nothing merges without evidence.
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-v1.1.1-informational)](#)
+[![version](https://img.shields.io/badge/version-v1.2.0-informational)](#)
 
 - 繁體中文版：[README.zh-TW.md](README.zh-TW.md)
-- Core flow (what Claude Code loads): [`advisor-dispatch/SKILL.md`](advisor-dispatch/SKILL.md)
+- Core flow (what Claude Code loads): [`skills/advisor-dispatch/SKILL.md`](skills/advisor-dispatch/SKILL.md)
 
 ---
 
@@ -103,17 +103,26 @@ The full table is at the top of `SKILL.md`.
 
 ```bash
 # personal, all projects
-mkdir -p ~/.claude/skills && cp -R advisor-dispatch ~/.claude/skills/
+mkdir -p ~/.claude/skills && cp -R skills/advisor-dispatch ~/.claude/skills/
 # or one project only
-mkdir -p <project>/.claude/skills && cp -R advisor-dispatch <project>/.claude/skills/
+mkdir -p <project>/.claude/skills && cp -R skills/advisor-dispatch <project>/.claude/skills/
 ```
 
 A skill is a folder with a `SKILL.md`: no manifest, no marketplace, and you can edit it to
 match your own conventions (commit style, test commands). Restart the Claude Code session;
 the skill is triggered by its description, for example "dispatch this work".
 
-**B. Plugin.** Better for many recipients with versioned updates, but it needs a plugin
-manifest and a marketplace. This repo ships neither, and plugin installation was **not tested**.
+**B. Plugin (installs and updates with commands)**
+
+```
+/plugin marketplace add Chuanyin1202/advisor-dispatch
+/plugin install advisor-dispatch@advisor-dispatch
+```
+
+`claude plugin validate` passes for the plugin manifest, the marketplace manifest and the skill, and
+installing from a local checkout into a clean Claude Code config directory succeeded. Not tested:
+installing from the GitHub source in an interactive session, and triggering the skill from a
+plugin install.
 
 ---
 
@@ -129,8 +138,8 @@ The advisor writes a plan and a ticket table, waits for your approval, records t
 dispatches the tickets in one message, patrols, collects evidence tables, reviews and
 re-verifies each ticket, merges in order, and asks before pushing.
 
-Templates: [`templates/ticket.md`](advisor-dispatch/templates/ticket.md) and
-[`templates/evidence-table.md`](advisor-dispatch/templates/evidence-table.md).
+Templates: [`templates/ticket.md`](skills/advisor-dispatch/templates/ticket.md) and
+[`templates/evidence-table.md`](skills/advisor-dispatch/templates/evidence-table.md).
 
 ---
 
@@ -180,7 +189,7 @@ internal contradictions); both rounds' findings were fixed.
 **Future work**
 
 1. Run the fix loop, the patrol and the verifier on a real multi-ticket task.
-2. Package as a plugin once the install flow has been tested.
+2. Test the GitHub-source plugin install and the skill trigger from a plugin install.
 3. Optional hooks that enforce the cheapest red lines (no push without consent).
 
 ---
@@ -188,7 +197,8 @@ internal contradictions); both rounds' findings were fixed.
 ## Repository layout
 
 ```
-advisor-dispatch/
+.claude-plugin/                plugin.json, marketplace.json
+skills/advisor-dispatch/
 ├── SKILL.md                    core flow (what Claude Code loads)
 ├── references/
 │   ├── evidence-table.md       evidence rules and the structural-dependency exception
