@@ -98,8 +98,7 @@ mkdir -p ~/.claude/skills && cp -R skills/advisor-dispatch ~/.claude/skills/
 mkdir -p <專案>/.claude/skills && cp -R skills/advisor-dispatch <專案>/.claude/skills/
 ```
 
-skill 就是一個含 `SKILL.md` 的資料夾：不需要 manifest 或 marketplace，也能直接改成自己的慣例
-（commit 格式、測試指令）。重開 Claude Code session 後，用描述觸發，例如說「幫我派工做這件事」。
+skill 就是一個含 `SKILL.md` 的資料夾，可以直接改成自己的慣例（commit 格式、測試指令）。重開 Claude Code session 後，用描述觸發，例如說「幫我派工做這件事」。
 
 **B. Plugin（用指令安裝與更新）**
 
@@ -108,19 +107,13 @@ skill 就是一個含 `SKILL.md` 的資料夾：不需要 manifest 或 marketpla
 /plugin install advisor-dispatch@advisor-dispatch
 ```
 
-已測試：`claude plugin validate` 對 plugin manifest、marketplace manifest 與 skill 都通過，
-並且已用本機 checkout 在乾淨的 Claude Code config 目錄裡安裝成功。
-**未測試**：`owner/repo` 的 GitHub 來源形式，以及從 plugin 安裝後觸發 skill。
-
-**C. `npx skills`（一行指令，支援它列出的各種 agent）**
+**C. `npx skills`（一行指令）**
 
 ```bash
 npx skills add Chuanyin1202/advisor-dispatch -a claude-code -s advisor-dispatch
 ```
 
-已用 `skills@1.7.0`（[vercel-labs/skills](https://github.com/vercel-labs/skills)，MIT）測試：
-從本機 git clone 安裝到專案，複製出 6 個 skill 檔案，與本 repo 內容逐位元相同。
-**未測試**：GitHub 來源形式，以及其他 agent。該工具的說明文字提到安裝遙測，在意的話請查它的文件。
+會裝進執行指令所在的專案。
 
 ---
 
@@ -128,7 +121,7 @@ npx skills add Chuanyin1202/advisor-dispatch -a claude-code -s advisor-dispatch
 
 ```
 幫我用派工模式做：新增訂單匯出 API（CSV）與對應的前端按鈕。
-先拆單、給我看檔案所有權切割，我同意再派。實作用 sonnet，安全相關那張加 verifier。
+先拆單、給我看檔案所有權切割，我同意再派。實作用預設模型，安全相關那張用 opus 並加 verifier。
 ```
 
 advisor 先產計畫與工單表，等你同意後記 base SHA、同一則訊息派出各單、巡視、收證據表、
@@ -162,6 +155,10 @@ ticket-2 merged (8b7a54eb7039f1e7ed4e1a8d00d99709d174c47e); full suite 8 tests O
 非行為型驗收項沒有說明怎麼複驗。實跑之前，文字另經第二個模型兩輪獨立審查（先查翻譯忠實度，再查內部矛盾），
 兩輪的發現都已修正。
 
+**安裝路徑**（各在乾淨環境測試，並用 `diff -r` 與本 repo 比對檔案）：手動複製、
+從 GitHub `owner/repo` 來源安裝 plugin（`claude plugin list` 顯示 enabled）、
+以及從 GitHub 來源執行 `npx skills@1.7.0 add Chuanyin1202/advisor-dispatch`。
+
 ---
 
 ## 限制與未來工作
@@ -171,6 +168,8 @@ ticket-2 merged (8b7a54eb7039f1e7ed4e1a8d00d99709d174c47e); full suite 8 tests O
 - **只有一次實跑、兩張工單。** 比這更大或更髒的任務都沒測過。
 - **這次實跑沒走到的部分**：修正迴圈（用 `SendMessage` 喚醒已完成的 agent）、巡視（工單太短不需要）、
   verifier、部署步驟。
+- **從已安裝的副本觸發**（plugin 或 `npx skills`）沒有跑過；端到端只用專案層級的副本驅動過。
+  `npx skills` 支援的其他 agent 也沒測。
 - **備援路徑**（沒有 `SendMessage`／`ListAgents`／排程）只寫成文字，沒有實際跑過。
 - **recovery agent 進既有 worktree** 靠 agent 遵守路徑規則，因為 Agent tool 沒有沿用 worktree 的參數；
   必須做洩漏檢查，且這條路未測試。
@@ -180,7 +179,7 @@ ticket-2 merged (8b7a54eb7039f1e7ed4e1a8d00d99709d174c47e); full suite 8 tests O
 **未來工作**
 
 1. 在真實的多工單任務上跑修正迴圈、巡視與 verifier。
-2. 測試 GitHub 來源的 plugin 與 `npx skills` 安裝，以及 plugin 安裝後 skill 的觸發。
+2. 從 plugin 安裝與 `npx skills` 安裝的副本各跑一次完整流程。
 3. 用選用的 hook 強制最便宜的紅線（未經同意不得 push）。
 
 ---

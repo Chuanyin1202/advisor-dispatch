@@ -108,9 +108,9 @@ mkdir -p ~/.claude/skills && cp -R skills/advisor-dispatch ~/.claude/skills/
 mkdir -p <project>/.claude/skills && cp -R skills/advisor-dispatch <project>/.claude/skills/
 ```
 
-A skill is a folder with a `SKILL.md`: no manifest, no marketplace, and you can edit it to
-match your own conventions (commit style, test commands). Restart the Claude Code session;
-the skill is triggered by its description, for example "dispatch this work".
+A skill is a folder with a `SKILL.md`, so you can edit it to match your own conventions
+(commit style, test commands). Restart the Claude Code session; the skill is triggered by its
+description, for example "dispatch this work".
 
 **B. Plugin (installs and updates with commands)**
 
@@ -119,20 +119,13 @@ the skill is triggered by its description, for example "dispatch this work".
 /plugin install advisor-dispatch@advisor-dispatch
 ```
 
-Tested: `claude plugin validate` passes for the plugin manifest, the marketplace manifest and the
-skill, and installing from a local checkout into a clean Claude Code config directory succeeded.
-Not tested: the `owner/repo` GitHub source form, and triggering the skill from a plugin install.
-
-**C. `npx skills` (one command, any agent it supports)**
+**C. `npx skills` (one command)**
 
 ```bash
 npx skills add Chuanyin1202/advisor-dispatch -a claude-code -s advisor-dispatch
 ```
 
-Tested with `skills@1.7.0` ([vercel-labs/skills](https://github.com/vercel-labs/skills), MIT):
-installing from a local git clone into a project copied the six skill files, byte-identical to
-this repository. Not tested: the GitHub source form, and other agents. The tool's help text
-mentions install telemetry; check its documentation if that matters to you.
+Installs into the project the command is run in.
 
 ---
 
@@ -141,7 +134,7 @@ mentions install telemetry; check its documentation if that matters to you.
 ```
 Use dispatch mode to build: an order-export API (CSV) and a matching front-end button.
 Split tickets first and show me the file-ownership partition; I'll approve before you dispatch.
-Use sonnet for implementation, and add a verifier to the security-related ticket.
+Use the default model for implementation, opus for the security-related ticket, and add a verifier to that one.
 ```
 
 The advisor writes a plan and a ticket table, waits for your approval, records the base SHA,
@@ -179,6 +172,10 @@ non-behavioral acceptance items had no stated way to be re-checked. Before the r
 had gone through two independent reviews by a second model (translation fidelity, then
 internal contradictions); both rounds' findings were fixed.
 
+**Install paths** (each in a clean environment, files compared with `diff -r` against this repo):
+manual copy, the plugin from the GitHub `owner/repo` source (`claude plugin list` shows it
+enabled), and `npx skills@1.7.0 add Chuanyin1202/advisor-dispatch` from the GitHub source.
+
 ---
 
 ## Limitations and future work
@@ -188,6 +185,8 @@ internal contradictions); both rounds' findings were fixed.
 - **Only one live run, two tickets.** Anything beyond a small, clean task is untested.
 - **Not exercised in that run:** the fix loop (resuming a finished agent with `SendMessage`),
   the patrol (the tickets were too short to need one), the verifier, and the deploy step.
+- **Triggering from an installed copy** (plugin or `npx skills`) was not run; only the
+  project-level copy was driven end to end. Other agents supported by `npx skills` are untested.
 - **Fallback paths** (no `SendMessage` / `ListAgents` / scheduler) are written down, not run.
 - **The recovery agent into an existing worktree** relies on the agent obeying a path rule,
   because the Agent tool has no parameter to reuse a worktree. A leak check is required and
@@ -199,7 +198,7 @@ internal contradictions); both rounds' findings were fixed.
 **Future work**
 
 1. Run the fix loop, the patrol and the verifier on a real multi-ticket task.
-2. Test the GitHub-source plugin and `npx skills` installs, and the skill trigger from a plugin install.
+2. Drive a full run from a plugin install and from an `npx skills` install.
 3. Optional hooks that enforce the cheapest red lines (no push without consent).
 
 ---
