@@ -1,6 +1,6 @@
 # advisor-dispatch：派工／監工開發模式（Claude Code skill）
 
-版本：v1.1.0
+版本：v1.1.1
 
 English: [README.md](README.md)
 

@@ -1,6 +1,6 @@
 # advisor-dispatch: dispatch-and-supervise development mode (Claude Code skill)
 
-Version: v1.1.0 · [繁體中文](README.zh-TW.md)
+Version: v1.1.1 · [繁體中文](README.zh-TW.md)
 
 ## What it does
 The main session acts as the **advisor** (plans, splits tickets, reviews, merges, watches the
