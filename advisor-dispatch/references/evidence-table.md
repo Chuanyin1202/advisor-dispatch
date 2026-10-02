@@ -16,6 +16,9 @@ There must be a "Known weaknesses" row (write "none" if there are none).
 - **Cannot verify by command != cannot verify.** UI, animation, back paths and on-device
   permissions are verified by hand, but you must state the environment, the steps, the
   expected result and the actual observation. "I checked it" and a single screenshot do not count.
+- **Non-behavioral items** (for example "only these two files are committed", "no new dependency")
+  are verified by the matching git / filesystem command (`git diff <base>..HEAD --name-only`,
+  `git diff <base>..HEAD -- <manifest>`), and the advisor reruns that same command at re-check.
 - If there is truly no feasible way to verify, or the environment lacks a dependency /
   credential / running service, mark **UNVERIFIED and state why**. Never guess, never fill in PASS.
 - **If any row has an implementer verdict of FAIL / UNVERIFIED, the ticket goes back at the evidence gate. The "Advisor re-check" column starts as PENDING and is filled by the advisor during review; at merge time the cell of every acceptance-item row must be PASS (the "Known weaknesses" row has no re-check), otherwise the ticket may not be merged.**

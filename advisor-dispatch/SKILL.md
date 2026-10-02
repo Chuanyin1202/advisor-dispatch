@@ -162,7 +162,8 @@ The ticket prompt must contain (this is the implementer's contract):
    the project's convention)
 5. Report format: `status` (DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED) + dispatch
    number + absolute worktree path + branch name + commit hashes + acceptance evidence table
-   + concerns.
+   + concerns. The Agent call does not return the worktree path and its location is chosen by the
+   tool, not by you: record `worktree=pending` at dispatch and fill in the path from the report.
 6. "Do not symlink the main repo's dependency directories (`node_modules`, `.venv`, ...) into
    the worktree; install inside the worktree. A symlink makes type checks and tests read the
    main tree's code and exit 0 without verifying your change. Before reporting, run
@@ -304,7 +305,9 @@ The advisor never edits code itself. The urge to "just fix this one thing" is a 
   ticket green alone does not mean the whole is green.
 - When everything is merged, clean up: `git worktree remove <path>` + `git branch -d
   <ticket-branch>`, and confirm with `git worktree list`. Worktrees of superseded / canceled
-  tickets must be handled too.
+  tickets must be handled too. If removal fails because of untracked files, list them with
+  `git -C <path> status --short`; only when they are all regenerable artifacts (`__pycache__`,
+  build output) use `git worktree remove --force`. Anything else untracked: look at it first.
 - If the verifier ran through an external CLI that left a long-running background process in
   a worktree, reclaim it after the worktree is deleted (see `references/verifier.md`).
 - No `git reset --hard`, no force push; confirm remote / branch before pushing.
@@ -330,8 +333,8 @@ Y" — report what you observed.
 ## Progress ledger (against compaction amnesia)
 
 Long sessions get compacted, and memory alone will re-dispatch finished tickets (the most
-expensive failure mode). At the start, create a ledger (in a scratchpad or a git-ignored path
-inside the repo) and append one line per event. Format, vocabulary, the three terminal states
+expensive failure mode). At the start, create a ledger (in a scratchpad, or a path git ignores — if the repo has
+no suitable `.gitignore` entry, `.git/dispatch-ledger.md` works and is never tracked) and append one line per event. Format, vocabulary, the three terminal states
 and the pre-close check are in `references/ledger.md`. After compaction, read the ledger and
 `git log` before deciding the next step; trust the ledger, not memory.
 

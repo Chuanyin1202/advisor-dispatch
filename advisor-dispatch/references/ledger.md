@@ -1,10 +1,11 @@
 # Progress ledger
 
-Keep it in a scratchpad or a git-ignored path inside the repo; append one line per event:
+Keep it in a scratchpad or a path git ignores (if the repo has no suitable `.gitignore` entry, `.git/dispatch-ledger.md` works and is never tracked); append one line per event:
 
 ```
 ticket-1#a1 dispatching
-ticket-1#a1 dispatched (model=<model>, worktree=<path>, base=<full SHA>)
+ticket-1#a1 dispatched (model=<model>, worktree=pending, base=<full SHA>)
+ticket-1#a1 worktree=<path> (filled in from the report)
 ticket-1 question q1: <one-line summary>
 ticket-1 q1 answered
 ticket-1#a1 nudge #1
@@ -17,7 +18,7 @@ decision: <topic> -> <choice> (<date>, <who decided>)
 deploy: verified on <env> at <endpoint>
 ```
 
-Process events use only these words: `dispatching`, `dispatched`, `nudge #k`, `unverifiable`,
+Process events use only these words: `dispatching`, `dispatched`, `worktree=<path>`, `nudge #k`, `unverifiable`,
 `stale report ignored`, `question qM: <summary>`, `qM answered`, `decision: <topic> -> <choice>`,
 `review round N: PASS|FAIL`, `blocked (on <named party>)`.
 
