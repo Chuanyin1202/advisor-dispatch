@@ -21,7 +21,7 @@ the concept is never dropped:
 
 | Capability | If present | If absent (fallback) |
 |---|---|---|
-| `SendMessage` (continue the same subagent) | Send review findings and nudges to the original agent | Only after the original agent has finished may you dispatch a new agent into the **same worktree**, with the previous findings and current state in the prompt. If the original agent may still be alive, do not dispatch |
+| `SendMessage` (continue the same subagent) | Send review findings and nudges to the original agent | Only after the original agent has finished may you dispatch a new agent into the **same worktree** (how: see "Recovery / follow-up agent in an existing worktree" in Step 2), with the previous findings and current state in the prompt. If the original agent may still be alive, do not dispatch |
 | `ListAgents` (is the agent still alive) | Use it for patrols and before any re-dispatch | Infer from commit / uncommitted-change activity in the worktree plus Agent completion notices. If you cannot confirm it has finished, treat it as alive |
 | Scheduled wake-up (background sleep, cron-style tool) | Wake up every ~10 minutes to patrol | Patrol whenever any message arrives, and tell the user "there is no automatic wake-up; I only patrol when you interact" |
 | External model CLI as verifier (a coding agent from a different model family) | Strongest independence, see `references/verifier.md` | Use a fresh subagent at the advisor's level as verifier |
@@ -140,6 +140,18 @@ Agent({
 ```
 
 Dispatch a parallel batch **in the same message**.
+
+**Recovery / follow-up agent in an existing worktree.** `isolation: "worktree"` always creates a
+*new* worktree; the Agent tool's schema has no parameter to reuse an existing one. To put a
+recovery or follow-up agent into the current worktree, dispatch it **without** `isolation` and
+put in its prompt: the absolute worktree path, the branch name, the expected base, and the rule
+"work only inside this path (use `git -C <path>` and absolute paths; never edit the main
+checkout)". At review, confirm via `git -C <worktree> status --short` and `git diff <base>..HEAD`
+that the changes landed in the worktree and nothing leaked into the main checkout. Alternative (uses only supported behavior): once the old agent has stopped and its work is
+committed, dispatch the recovery agent with its own fresh `isolation: "worktree"` and tell it to
+first `git merge <old-branch>` (or cherry-pick the listed commits); then retire the old worktree.
+Untested: the "no isolation, work by path" route relies on the agent obeying the path rule, so
+the leak check above is mandatory.
 
 The ticket prompt must contain (this is the implementer's contract):
 1. One sentence on where this ticket sits in the overall project.
