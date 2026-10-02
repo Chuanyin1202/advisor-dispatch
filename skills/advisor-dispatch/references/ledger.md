@@ -4,7 +4,7 @@ Keep it in a scratchpad or a path git ignores (if the repo has no suitable `.git
 
 ```
 ticket-1#a1 dispatching
-ticket-1#a1 dispatched (model=<model>, worktree=pending, base=<full SHA>)
+ticket-1#a1 dispatched (model=<model>, level=<lighter|default|stronger>, worktree=pending, base=<full SHA>)
 ticket-1#a1 worktree=<path> (filled in from the report)
 ticket-1 question q1: <one-line summary>
 ticket-1 q1 answered

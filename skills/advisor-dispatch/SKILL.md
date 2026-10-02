@@ -41,6 +41,30 @@ by the author. Use whatever tools are actually available.
 - **Verifier** (high-risk tickets only): independent of the implementer, level ≥ the
   implementer. Selection order is in `references/verifier.md`.
 
+### Choosing the implementer's level for each ticket
+
+Decide per ticket, at split time, and write the choice into the ledger's `dispatched` line.
+Think in three levels, not model names; map each level to whatever models are available now.
+
+| Ticket | Level |
+|---|---|
+| The user named a model for it | that model, no further judgment |
+| Low risk and mechanical: copy changes, config, a single-file edit with an obvious fix | lighter than the default |
+| Ordinary implementation | the default (mid-tier) |
+| High risk: security / permissions / money, concurrency, data migration, multi-file core logic (same definition as in Step 3) | stronger than the default, **and** an independent verifier |
+| The spec is vague, or the ticket needs design decisions rather than execution | stronger than the default, or split / clarify the ticket first |
+
+Rules around the table:
+- **Cost is not a reason to drop a level on a high-risk ticket.** A cheaper model that needs two
+  send-backs usually costs more than a stronger one that passes first time.
+- **Escalate on evidence, not on feeling:** `BLOCKED` because the task is too hard, or the same
+  finding sent back twice (Step 4). Escalating means re-dispatching with a stronger level and a
+  changed prompt, never the same prompt again.
+- **Never go below the level the user asked for**, and never pick the verifier's level lower than
+  the implementer's.
+- The table is a starting point, not a measured threshold. If the project has its own
+  convention (for example "all migrations go to the strongest model"), follow that instead.
+
 ## Flow overview
 
 ```
