@@ -1,269 +1,343 @@
 ---
 name: advisor-dispatch
-description: 派工／監工開發模式：主 session 只規劃、拆單、review、merge，實作交給各自 git worktree 裡的 subagent。用於「派工、開工單、平行開發、worktree、advisor 模式、delegate to subagents」；單線小改動不適用。Use when splitting work into tickets for isolated subagents with evidence-gated review.
+description: Advisor/dispatch development mode. The main session only plans, splits work into tickets, reviews, merges and watches deploys; implementation is done by subagents, each in its own git worktree. Use when asked to dispatch work, write tickets, run parallel development, use worktrees, "advisor mode", or delegate to subagents. Not for small single-thread edits.
 ---
 
-# Advisor Dispatch — 派工監工開發模式
+# Advisor Dispatch — dispatch-and-supervise development mode
 
-主 session 是 **advisor**：只做規劃、拆單、review、merge、盯部署，**不寫實作碼**。
-實作全部由 subagent 在各自的 git worktree 完成。
+The main session is the **advisor**: it plans, splits tickets, reviews, merges and watches
+deployment. It does **not write implementation code**. All implementation is done by
+subagents, each in its own git worktree.
 
-為什麼這樣分工：advisor 的 context 要留給跨工單的協調與品質判斷；advisor 自己下場改 code
-會被實作細節污染，也會和 worktree 裡的 agent 搶檔案。
+Why this split: the advisor's context is reserved for cross-ticket coordination and quality
+judgment. If the advisor starts editing code, its context fills with implementation detail
+and it competes with the worktree agents for the same files.
 
-## 前置條件與備援（先看這張表）
+## Prerequisites and fallbacks (read this table first)
 
-核心流程只需要：git、Agent tool（可指定 `isolation: "worktree"` 與 `model`）、Bash。
-其餘都是「有就用，沒有就走備援」，概念不刪：
+The core flow needs only: git, the Agent tool (able to set `isolation: "worktree"` and
+`model`), and Bash. Everything else is "use it if present, otherwise use the fallback" —
+the concept is never dropped:
 
-| 能力 | 有的話 | 沒有的話（備援） |
+| Capability | If present | If absent (fallback) |
 |---|---|---|
-| `SendMessage`（繼續同一個 subagent） | 修正迴圈、催促都送給原 agent | 原 agent 已結束才能補派新 agent 進**同一棵 worktree**，prompt 附上上一輪 findings 與現況；原 agent 若還活著，禁止補派 |
-| `ListAgents`（看 agent 是否還活著） | 巡視、重派前確認 | 用 worktree 的 commit／未提交修改有無變化＋Agent 完成通知判斷；無法確認終止就當它還活著 |
-| 排程／背景喚醒（背景 sleep、cron 類工具） | 每 ~10 分鐘喚醒巡視 | 每次收到任何訊息就順便巡一輪，並告訴用戶「目前沒有自動喚醒，我只會在你互動時巡」 |
-| 外部模型 CLI 當 verifier（例如另一家族的 coding agent） | 獨立性最強，見 `references/verifier.md` | verifier 改用 advisor 同級的 fresh subagent |
-| 內容閘門（機械判斷「證據是否支持驗收項」） | 一次請求逐列判定 | advisor 逐列自己讀：證據是否對那條驗收項說話 |
-| 專案既有計畫／spec | 直接拆單 | 先產一份計畫再拆 |
+| `SendMessage` (continue the same subagent) | Send review findings and nudges to the original agent | Only after the original agent has finished may you dispatch a new agent into the **same worktree**, with the previous findings and current state in the prompt. If the original agent may still be alive, do not dispatch |
+| `ListAgents` (is the agent still alive) | Use it for patrols and before any re-dispatch | Infer from commit / uncommitted-change activity in the worktree plus Agent completion notices. If you cannot confirm it has finished, treat it as alive |
+| Scheduled wake-up (background sleep, cron-style tool) | Wake up every ~10 minutes to patrol | Patrol whenever any message arrives, and tell the user "there is no automatic wake-up; I only patrol when you interact" |
+| External model CLI as verifier (a coding agent from a different model family) | Strongest independence, see `references/verifier.md` | Use a fresh subagent at the advisor's level as verifier |
+| Content gate (mechanically judging whether evidence supports an acceptance item) | One request judges every row | The advisor reads row by row: does the evidence actually speak to that acceptance item? |
+| Existing plan / spec | Split tickets from it directly | Write a plan first, then split |
 
-「未驗證」聲明：以上備援在本機以外的 Claude Code 版本是否都可行，作者未全部驗證；
-工具缺失時以實際可用的為準。
+Unverified: whether every fallback works on every Claude Code version has not been checked
+by the author. Use whatever tools are actually available.
 
-## Model 選擇（參數化，不寫死）
+## Model selection (parameterized, never hard-coded)
 
-- **Advisor** = 當前主 session 的 model，不需設定。
-- **Implementer** = Agent tool 的 `model` 參數。預設用中階模型（如 `"sonnet"`）；用戶指定
-  「這單給 opus」就改該張（或全部）。每次派工都**明確指定** model，不要省略
-  （省略會繼承主 session model，通常是最貴的那顆）。
-- **Verifier**（高風險工單才出動）：獨立於 implementer，階級 ≥ implementer。選擇順序見
-  `references/verifier.md`。
+- **Advisor** = the current main-session model. No configuration.
+- **Implementer** = the Agent tool's `model` parameter. Default to a mid-tier model (for
+  example `"sonnet"`). If the user says "give this ticket to opus", change that ticket (or
+  all of them). Always set `model` **explicitly** on every dispatch; omitting it inherits the
+  main session's model, usually the most expensive one.
+- **Verifier** (high-risk tickets only): independent of the implementer, level ≥ the
+  implementer. Selection order is in `references/verifier.md`.
 
-## 流程總覽
+## Flow overview
 
 ```
-0. 多步驟流程 → 先產流程契約（Step 1.5），接縫沒 owner 不准開工
-1. 拆單（含檔案所有權切割）
-2. 記下 base → 派工（每單一個 subagent + 獨立 worktree + 獨立 branch）
-3. 逐單 review（證據閘門 → advisor 親自看 diff）
-4. 未過 → 退回同一個 agent 修 → 重 review
-5. 全部通過 → advisor 依序 merge
-6. 盯部署 → 遠端驗證通過才算收工（驗證期間凍結）
+0. Multi-step flow -> write a flow contract first (Step 1.5); no seam without an owner may start
+1. Split tickets (including file-ownership partitioning)
+2. Record base -> dispatch (one subagent + own worktree + own branch per ticket)
+3. Review each ticket (evidence gate -> advisor reads the diff personally)
+4. Not passed -> send back to the same agent -> re-review
+5. All passed -> advisor merges in order
+6. Watch the deploy -> done only after remote verification (frozen during verification)
 ```
 
-## Step 1: 拆單
+## Step 1: Split tickets
 
-沒有計畫先產計畫。有計畫則拆成工單，每張必含（範本見 `templates/ticket.md`）：
-**目標**（一句話）、**驗收標準**（可驗證，不是「做好」）、**檔案所有權清單**、
-**測試要求**、**不做什麼**。
+With no plan, write one first. With a plan, split it into tickets. Every ticket must contain
+(template in `templates/ticket.md`): **goal** (one sentence), **acceptance criteria**
+(verifiable, not "done well"), **file-ownership list**, **test requirements**, and
+**out of scope**.
 
-### 檔案所有權切割（平行的前提）
+### File-ownership partitioning (the precondition for parallelism)
 
-worktree 只解決「working tree 互相踩」，**不解決 merge conflict**。
-- 同一個檔案在同一批平行工單中**只能屬於一張**
-- 必須動同一檔案（共用 route 註冊、schema）→ 這兩張串行，或抽成前置工單先做完
-- 拆完逐張比對所有權清單，無交集才准平行派出
+A worktree only stops working trees from stepping on each other; it does **not** prevent
+merge conflicts.
+- Within one parallel batch, a file may belong to **only one** ticket.
+- Two tickets that must touch the same file (shared route registration, schema) run in
+  series, or the shared edit is pulled out into a prerequisite ticket done first.
+- After splitting, compare the ownership lists ticket by ticket; dispatch in parallel only
+  when there is no overlap.
 
-### 平行 vs 串行：只是排程，不是兩套流程
+### Parallel vs serial: scheduling only, not two processes
 
-工單相依、擠在同一批檔案、需求邊做邊定 → 改**串行**：一次一張，DONE → review → 通過才派下一張。
-每張照樣走完整合約（worktree、回報格式、證據閘門、review）。
-**禁止**「不能平行 → advisor 自己下場做 → 跳過 review」。不用本 skill 的唯一理由是任務太小
-（一張工單都嫌多），不是「無法平行」。
+When tickets depend on each other, crowd the same files, or requirements are being decided
+as you go, run **serially**: one ticket at a time, DONE -> review -> pass, then dispatch the
+next. Each ticket still gets the full contract (worktree, report format, evidence gate,
+review).
 
-## Step 1.5: 流程契約（多步驟流程必做）
+**Forbidden** reasoning: "can't parallelize -> the advisor does it itself -> skip review".
+The only valid reason not to use this skill is that the task is too small (even one ticket is
+overkill), not that it "can't be parallelized".
 
-觸發：工單涉及兩個以上步驟、或用戶要的是「走完一條流程」而非「改好一個東西」。
-拆單**之前**先產三欄表：
+## Step 1.5: Flow contract (required for multi-step flows)
 
-| 步驟 | 進入方式（誰、從哪來、帶什麼狀態／參數） | 離開方式（每個出口去向，含返回／取消／失敗） |
+Trigger: a ticket involves two or more steps, or the user wants "a whole flow to work", not
+"one thing fixed". **Before** splitting, write a three-column table:
 
-- **接縫必須逐條指派給具名工單**（跳轉目標、返回路徑、context 參數、狀態延續、錯誤退回哪）。
-  沒有 owner 的接縫不准開工。典型失敗：每張單各自驗收都過，合起來流程是斷的。
-- 工單**禁止**用「不在本工單範圍」把接縫推掉，除非契約表已指名接手的是哪張。
-- 契約表與 spec／設計稿對照一次，缺口當場列出。
+| Step | Entry (who, from where, with what state/params) | Exit (destination of every exit, including back / cancel / failure) |
 
-## Step 1.6: 結構障礙必須上桌
+- **Every seam is assigned to a named ticket** (jump target, return path, context params,
+  state carry-over, where errors go back to). A seam with no owner may not start. Typical
+  failure: each ticket passes its own acceptance, yet the combined flow is broken.
+- A ticket may **not** dismiss a seam with "out of scope for this ticket" unless the contract
+  names which ticket takes it.
+- Cross-check the contract against the spec / design / requirements once; list gaps
+  immediately.
 
-實作中發現要動既有共用層／已上線功能／寫死的單一情境假設／別人的模組時，
-**停下來把取捨擺給用戶決定**：繞過（相容層／過渡層／切窄工單）vs 正面拆開，附成本、風險、建議。
-用戶拍板後在 ledger 記 `decision: <議題> → <選擇>（日期）`，受影響工單改寫後才繼續派。
-**禁止**自己選擇繞過然後繼續派工——怕動到上線功能是用戶的風險決策，不是 advisor 可以吞下的。
+## Step 1.6: Structural obstacles go to the user
 
-## Step 2: 派工
+If implementation reveals that you must touch an existing shared layer, a live feature, a
+hard-coded single-scenario assumption, or someone else's module: **stop and put the
+trade-off in front of the user** — work around it (compat layer / transition layer / narrower
+ticket) vs. restructure properly, with cost, risk and a recommendation. After the user
+decides, record `decision: <topic> -> <choice> (date)` in the ledger and rewrite the
+affected tickets before dispatching further. **Never** pick the workaround yourself and keep
+dispatching — worry about breaking a live feature is the user's risk decision, not something
+the advisor may absorb.
 
-### 派工前置快照
+## Step 2: Dispatch
 
-呼叫 Agent 之前，先記下目標整合分支的**完整** base：`git -C <repo> rev-parse HEAD`。
+### Pre-dispatch snapshot
 
-- ledger 逐張記 `repo + 目標 branch + 完整 SHA`（短 SHA 只用於顯示）
-- 串行工單在**前一張 merge 並通過整合測試後重新取得** base
-- 預期 base 寫進工單 prompt，要求 implementer 開工前核對，不一致就停下回報
-- Step 3 一律用 ledger 的完整 base 算 diff，不准延後補記
-- **每次派工有自己的編號** `ticket-N#aK`（K 遞增；重派、換 model、recovery 都算新的一次），
-  寫進工單 prompt，要求回報原樣帶回
-- 呼叫前先在 ledger 追加 `ticket-N#aK dispatching`，成功再追加 `dispatched`。呼叫報錯或逾時
-  **不准直接重派**：先確認這次到底有沒有開成（`git worktree list`，有 `ListAgents` 就一起看），
-  開成了就沿用，確定沒開成才以下一個編號重派。直接重派會讓同一張單同時有兩個 agent
+Before calling Agent, record the **full** base of the target integration branch:
+`git -C <repo> rev-parse HEAD`.
+
+- The ledger records `repo + target branch + full SHA` per ticket (short SHAs are for display only).
+- A serial ticket takes a **fresh** base after the previous one is merged and the
+  integration tests pass.
+- Put the expected base in the ticket prompt; the implementer must check it before starting
+  and stop and report if it differs.
+- Step 3 always diffs against the full base in the ledger; never back-fill it later.
+- **Every dispatch has its own number** `ticket-N#aK` (K increments; a re-dispatch, a model
+  change or a recovery each counts as a new one). Put it in the ticket prompt and require
+  the report to echo it back unchanged.
+- Before calling, append `ticket-N#aK dispatching` to the ledger; append `dispatched` once
+  it succeeds. If the call errors or times out, **do not re-dispatch directly**: first
+  determine whether it actually started (`git worktree list`, plus `ListAgents` if you have
+  it). If it did, keep it; only if it certainly did not, re-dispatch under the next number.
+  A direct re-dispatch leaves two agents on one ticket.
 
 ```
 Agent({
   subagent_type: "general-purpose",
-  name: "ticket-1-<簡短功能名>",
+  name: "ticket-1-<short-feature-name>",
   model: "<implementer model>",
   isolation: "worktree",
-  prompt: <工單 prompt>
+  prompt: <ticket prompt>
 })
 ```
 
-同一批平行工單在**同一個 message 一起派**。
+Dispatch a parallel batch **in the same message**.
 
-工單 prompt 必含（implementer 的合約）：
-1. 一句話說明這張工單在整個專案中的位置
-2. 工單全文（目標、驗收標準、檔案所有權、測試要求、不做什麼）
-3. 「你在獨立 worktree 工作，只准動所有權清單內的檔案；需要動清單外檔案就停下回報」
-4. 「完成後 commit 到你的 branch，**不要 push、不要 merge**」（commit 格式依專案慣例）
-5. 回報格式：`status`（DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED）＋派工編號
-   ＋ worktree 絕對路徑 ＋ branch 名 ＋ commit hashes ＋ 驗收證據表 ＋ 疑慮
-6. 「不准把主 repo 的依賴目錄（`node_modules`、`.venv` 等）symlink 進 worktree，要在 worktree
-   內自己安裝（symlink 會讓型別檢查與測試讀到主樹程式碼，exit 0 卻沒驗到你的改動）。回報前跑
-   `find . -maxdepth 2 -type l \( -name node_modules -o -name .venv \)`，必須無輸出」。
-   advisor review 時重跑同一條，有輸出就退回，該工單所有綠燈證據作廢。
+The ticket prompt must contain (this is the implementer's contract):
+1. One sentence on where this ticket sits in the overall project.
+2. The full ticket (goal, acceptance criteria, file ownership, test requirements, out of scope).
+3. "You work in an isolated worktree and may only touch files in your ownership list; if you
+   need to touch anything else, stop and report."
+4. "When done, commit to your branch. **Do not push, do not merge.**" (commit style follows
+   the project's convention)
+5. Report format: `status` (DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED) + dispatch
+   number + absolute worktree path + branch name + commit hashes + acceptance evidence table
+   + concerns.
+6. "Do not symlink the main repo's dependency directories (`node_modules`, `.venv`, ...) into
+   the worktree; install inside the worktree. A symlink makes type checks and tests read the
+   main tree's code and exit 0 without verifying your change. Before reporting, run
+   `find . -maxdepth 2 -type l \( -name node_modules -o -name .venv \)`; it must print nothing."
+   At review the advisor reruns the same command; any output means send it back and **all
+   green evidence for that ticket is void**.
 
-不要把整個 session 歷史貼進 prompt，fresh agent 只需要工單、會碰到的介面、全域約束。
+Do not paste the whole session history into the prompt. A fresh agent needs only its ticket,
+the interfaces it will touch, and global constraints.
 
-### 驗收證據表
+### Acceptance evidence table
 
-一條驗收標準一列，不得合併或省略；格式與判定規則見 `references/evidence-table.md`（含結構相依例外）。
-核心規則：任一列是 FAIL／UNVERIFIED／PENDING，整張工單不得判通過、不得 merge。
+One row per acceptance criterion, never merged or omitted. Format and judging rules, including
+the structural-dependency exception, are in `references/evidence-table.md` (fill-in template: `templates/evidence-table.md`). Core rule: if any
+row has an implementer verdict of FAIL / UNVERIFIED, or an acceptance-item row whose advisor re-check is not PASS at merge time, the ticket may not pass and may not be merged.
 
-### 處理回報狀態
+### Handling reports
 
-- **先驗派工編號**：回報的 `ticket-N#aK` 必須等於 ledger 裡目前生效的那一次。對不上或沒帶
-  → 不收、不進 review，ledger 追加 `ticket-N#aK stale report ignored`，並確認舊 agent 已終止。
-- **DONE / DONE_WITH_CONCERNS** → 進 review（concerns 先讀，涉及正確性先處理）
-- **NEEDS_CONTEXT** → 補資訊，送給同一個 agent 繼續
-- **BLOCKED** → 缺 context 就補；任務太難就換更強 model 重派；工單太大就拆；計畫有問題就問用戶。
-  **絕不**原樣重派同一個 prompt 期待不同結果。
-- **沒有回報／null**（agent 被中止或中途死掉）→ **不得**視為 DONE，有 commit 也不得直接 review。
-  ① 先確認 agent 是否真的終止，還活著就等或停掉——**絕不**讓第二個 agent 進同一棵 worktree
-  （未 commit 的成果會被沖掉，不可恢復）
-  ② 用 `git worktree list`、branch 名、ledger 的 base 找回現場：`git status --short`、
-  `git log <base>..HEAD`、`git diff <base>..HEAD`、未提交修改、有無動到所有權清單外檔案
-  ③ 有可用成果 → 確認原 agent 已終止後派 recovery agent 補完並重交完整回報；沒有 → 從原 base 重派。
-  commit 只代表有可恢復成果，不代表完成，不得跳過 DONE → 證據閘門 → review。
+- **Check the dispatch number first**: the report's `ticket-N#aK` must equal the one currently
+  active in the ledger. Mismatch or missing -> do not accept it, do not review it; append
+  `ticket-N#aK stale report ignored` to the ledger and confirm the old agent has stopped.
+- **DONE / DONE_WITH_CONCERNS** -> go to review (read concerns first; handle any that touch
+  correctness).
+- **NEEDS_CONTEXT** -> supply it and continue the same agent.
+- **BLOCKED** -> missing context: supply it; task too hard: re-dispatch with a stronger model;
+  ticket too big: split it; plan is wrong: ask the user. **Never** re-dispatch the same prompt
+  unchanged and hope for a different result.
+- **No report / null** (agent was stopped or died mid-way) -> **not** DONE, and commits in the
+  worktree do not go straight to review.
+  (1) First confirm whether the agent has really stopped. If it is alive, wait or stop it —
+  **never** let a second agent into the same worktree (uncommitted work gets overwritten and
+  cannot be recovered).
+  (2) Reconstruct the state from `git worktree list`, the branch name and the ledger's base:
+  `git status --short`, `git log <base>..HEAD`, `git diff <base>..HEAD`, uncommitted changes,
+  any edits outside the ownership list.
+  (3) If there is usable work, after confirming the original agent has stopped, dispatch a
+  recovery agent to finish and resubmit a complete report; if not, re-dispatch from the
+  original base in a new worktree. A commit only means recoverable work exists, not that the
+  ticket is done; DONE -> evidence gate -> review may never be skipped.
 
-### 主動巡視（防放生）
+### Active patrol (against abandonment)
 
-不要假設 agent 一定會回報。advisor 停在原地等，用戶看到的就是「放生」。
-- **每 ~10 分鐘巡一輪**；沒有訊息可等時排一個喚醒（見前置條件表）。
-- **用事實判定，不等自述**。每輪對每張單取
-  `git -C <worktree> log --oneline <base>..HEAD | wc -l` 與 `git -C <worktree> status --short`，跟上輪比：
-  有變化 → working，不打擾；無變化且 agent 已 idle → stalled；
-  派出超過 3 分鐘仍無 commit 也無未提交修改 → unclaimed（先確認還活著，再送只指向工單的催促）。
-- **idle 但沒有最終回報**：① 先看 worktree 與結果檔，有成果直接 review；② 沒成果就催，
-  訊息第一行寫「你閒置 N 分鐘、我缺什麼」，**不重貼工單全文**，ledger 記 `nudge #k`；
-  ③ 催兩次沒動靜 → ledger 記 `unverifiable` 並告知用戶。沒回應 ≠ 已終止，無法確認終止就繼續巡視，
-  不得派第二個 agent 進同一棵 worktree。
-- **回報被截斷** → 當下要求補送缺的段落。
-- **裁決點**：agent 提問當下就回；問題進來記 `ticket-N question qM: <摘要>`，回覆後記 `qM answered`。
-- 外部 verifier 類 agent 的 prompt 明寫「跑完必須立刻回報」，巡視時直接檢查它落的結果檔。
+Never assume an agent will report. If the advisor just waits, the user sees "abandoned".
+- **Patrol every ~10 minutes**; when there is no message to wait on, schedule a wake-up
+  (see the prerequisites table).
+- **Judge state by facts, not self-report.** Each round, per ticket, take
+  `git -C <worktree> log --oneline <base>..HEAD | wc -l` and `git -C <worktree> status --short`
+  and compare with the previous round: changed -> working, leave it alone; unchanged and the
+  agent is idle -> stalled; more than 3 minutes since dispatch with no commit and no
+  uncommitted change -> unclaimed (confirm it is alive, then send a nudge that only points at
+  the ticket).
+- **Idle with no final report**: (1) look at the worktree and result files first; if there is
+  usable work, inspect it, then ask the agent for its full report and evidence table — the ticket is not reviewed or passed until both arrive (a commit is not a report); (2) otherwise nudge — first line says "you have been idle N
+  minutes, here is what I am missing", **do not repaste the ticket** (it will be treated as a
+  new ticket), and record `nudge #k` in the ledger; (3) two nudges with no movement -> record
+  `unverifiable` and tell the user. No response is not the same as stopped: if you cannot
+  confirm it stopped, keep patrolling and never send a second agent into the same worktree.
+- **Truncated report** -> immediately ask for just the missing part.
+- **Decision points**: answer the moment an agent asks; log `ticket-N question qM: <summary>`
+  when it arrives and `qM answered` after replying.
+- A prompt for an external verifier agent must say "report back immediately when done"; on
+  patrol, inspect the result file it writes directly.
 
-## Step 3: Review（advisor 親自，逐單）
+## Step 3: Review (the advisor, personally, one ticket at a time)
 
 ```bash
 git -C <worktree-path> log --oneline <base>..HEAD
 git -C <worktree-path> diff <base>..HEAD
 ```
-（base = ledger 的完整 SHA，不要用 `HEAD~1`——多 commit 工單會被截斷）
+(base = the full SHA in the ledger; do not use `HEAD~1` — it truncates multi-commit tickets.)
 
-三個 verdict，缺一不可：
-1. **Spec 符合度**：驗收標準逐條對，少做、多做（範圍外加料）都是 fail
-2. **品質**：正確性、邊界條件、測試是否真的在驗東西、是否違反專案慣例。自問：
-   改動依賴的前提在所有執行路徑下都成立嗎？讀取端全找了嗎？兄弟狀態的 producer/consumer 都補了嗎？
-3. **端到端親走**（有流程契約的工單專用，是宣告「可以測試了」的前置條件）：
-   advisor **本人**把契約表路徑從頭跑到尾（UI 就點過每個出口與返回；CLI／API 就依序執行整條鏈），
-   走過的路徑寫進 ledger。不得以 implementer 的截圖或自述代替。走不完就是未過。
-   跨工單 E2E 因結構相依須等合併後才走得完 → 適用證據表的具名例外，merge 後**立刻**補跑。
+Three verdicts, none optional:
+1. **Spec conformance**: check acceptance criteria one by one. Doing too little or too much
+   (out-of-scope additions) both fail.
+2. **Quality**: correctness, edge cases, whether the tests really verify something, whether
+   project conventions are violated. Ask yourself: does what this change relies on hold on
+   every execution path? Were all readers found? Were producers and consumers of sibling
+   state all updated?
+3. **End-to-end walk** (for tickets with a flow contract; a precondition for saying "ready to
+   test"): the advisor **personally** runs the contract's path start to finish (for UI, click
+   every exit and every back action; for CLI / API, run the whole chain in order), and logs the
+   path walked in the ledger. The implementer's screenshots or self-report do not count. If
+   you cannot finish the walk, it has not passed. If a cross-ticket E2E truly needs a merge
+   first (structural dependency), the named exception in the evidence-table reference
+   applies, and the full path is rerun **immediately** after the merge.
 
-**證據閘門**：沒有證據表、缺列、PASS 列沒有可重現證據、或任一列還是 FAIL／UNVERIFIED／PENDING
-→ 直接退回，不開始看 code，也不得 merge。
+**Evidence gate**: no evidence table, missing rows, a PASS row with no reproducible evidence,
+or any row whose **implementer verdict** is FAIL / UNVERIFIED (the "Advisor re-check" column
+starts as PENDING and is filled during review) -> send it back immediately, do not start
+reading code, and do not merge. Before merge, the "Advisor re-check" cell of every acceptance-item row must be PASS (the "Known weaknesses" row has no re-check).
 
-**內容閘門**：證據閘門只查形式；最常見的假通過是「證據貼了，但那段證據不支持那條驗收項」
-（`1 passed` 貼在測別的行為的驗收項底下、stdout 裡其實有 `1 failed` 卻判 PASS）。
-advisor 逐列把「驗收項原文＋implementer 判定」與該列證據配對，判 `supports / contradicts /
-says_nothing`：`contradicts` 與 `says_nothing` 都退回；拿不準就親自看那一列。
-有可用的機械判斷工具時可一次請求問完所有列，但：`supports` 不代表通過、它不判斷證據真偽、
-呼叫失敗就跳過這段（其餘閘門不放寬）。
+**Content gate**: the evidence gate checks form only. The most common false pass is "evidence
+was pasted, but it does not support that acceptance item" (`1 passed` pasted under an item that
+tests a different behavior, or stdout containing `1 failed` while marked PASS). The advisor
+pairs each row's evidence with "acceptance item text + implementer verdict" and judges
+`supports / contradicts / says_nothing`: both `contradicts` and `says_nothing` go back; if
+unsure, look at that row yourself. If a mechanical judging tool is available, ask for all rows
+in one request — but `supports` does not mean pass, it does not judge whether the evidence is
+genuine, and if the call fails you fall back to reading row by row yourself (the mechanical stage is skipped; no other gate is loosened).
 
-**UI 工單（有設計稿時）**：偏離設計稿的每一條都要有裁決來源（誰、哪天）。
-「有記錄」不等於「被授權」，寫得整齊的偏離表更要查來源。
+**UI tickets (when a design exists)**: every deviation from the design needs a decision
+source (who, which day). "Recorded" is not "authorized"; a neatly written deviation table
+deserves a source check even more.
 
-**advisor 複驗**（不是讀 implementer 貼的輸出）：高風險驗收項全部重跑
-（安全／權限／金流、併發、資料遷移、跨多檔核心邏輯，逐項判定），其餘至少挑一項**有實質風險**的重跑
-——挑最便宜的做形式合規不算數。沒有指令就親走一條手動路徑。跑不出同樣結果 = 未過；
-環境跑不起來 = 該項維持 UNVERIFIED 並擋住 merge，不得以自述代替。
+**Advisor re-verification** (not reading the implementer's pasted output): rerun **all**
+high-risk acceptance items (security / permissions / money, concurrency, data migration,
+multi-file core logic; judged item by item), and at least one other item with **real risk** —
+picking the cheapest one for form's sake does not count. With no command, walk one manual
+path. If you cannot reproduce the result, it has not passed; if the environment will not run,
+that item stays UNVERIFIED and blocks merge — the implementer's word is no substitute.
 
-### 高風險工單：加一道獨立 verifier
+### High-risk tickets: add an independent verifier
 
-碰到安全／權限／金流、併發、資料遷移、跨多檔核心邏輯的工單，advisor 過關後**再派 fresh-context
-verifier** 補一刀（advisor 剛拆完單，容易跟著 implementer 的邏輯走）。
-合約、模型選擇、收斂規則見 `references/verifier.md`。低風險工單不需要，多派只是燒錢。
+For tickets touching security / permissions / money, concurrency, data migration or
+multi-file core logic, after the advisor passes it, dispatch a **fresh-context verifier** for
+one more pass (the advisor just split the ticket and tends to follow the implementer's logic).
+Contract, model selection and convergence rules are in `references/verifier.md`. Low-risk
+tickets do not need it; an extra verifier is just spend.
 
-## Step 4: 修正迴圈
+## Step 4: Fix loop
 
-Review 未過 → 把 findings 送回**同一個 agent**（保有完整 context，比重派便宜準確；
-沒有 SendMessage 時見前置條件表）：
-- Findings 要具體：檔案、行為、期望 vs 實際
-- 修正後**更新原證據表**，重跑受影響的驗收項
-- 修完 advisor **重新 review**，不可因為「它說修好了」就放行
-- 同一個 finding 退回 2 次還修不好 → 換更強 model 重派，或停下問用戶
+Review not passed -> send findings back to the **same agent** (it has full context, cheaper and
+more accurate than a fresh one; without SendMessage see the prerequisites table):
+- Findings are specific: file, behavior, expected vs actual.
+- After fixing, **update the original evidence table** and rerun every acceptance item the
+  finding touches.
+- After the fix the advisor **re-reviews**; never pass it just because "it says it's fixed".
+- The same finding sent back twice and still not fixed -> re-dispatch with a stronger model,
+  or stop and ask the user.
 
-Advisor 全程不動手改 code。手癢想「順手修一下」就是違規。
+The advisor never edits code itself. The urge to "just fix this one thing" is a violation.
 
 ## Step 5: Merge
 
-- 有相依關係的先 merge 被依賴的；用專案慣例的 merge 方式
-- conflict（代表所有權切割漏了）→ 退回該工單 agent 在它的 worktree rebase，advisor 不自己解
-- **每 merge 一張跑一次全量測試／typecheck** 再 merge 下一張——單張各自綠不代表合起來綠
-- 全部完成後清理：`git worktree remove <path>` + `git branch -d <ticket-branch>`，
-  `git worktree list` 確認清完。superseded／canceled 工單的 worktree 同樣要處置
-- 若 verifier 走外部 CLI 並在 worktree 內留下常駐背景行程，worktree 刪除後一併回收（見 `references/verifier.md`）
-- 禁 `git reset --hard`、禁 force push；push 前確認 remote／branch
-- **push 必須有用戶明確同意**：merge 完成 ≠ 可以 push；用戶說過「不要 push 等我通知」就是鐵律
+- Merge dependencies first; use the project's usual merge method.
+- A conflict (meaning ownership partitioning missed something) -> send it back to that
+  ticket's agent to rebase in its worktree; the advisor does not resolve it.
+- **After each merge, run the full test / typecheck suite** before merging the next — each
+  ticket green alone does not mean the whole is green.
+- When everything is merged, clean up: `git worktree remove <path>` + `git branch -d
+  <ticket-branch>`, and confirm with `git worktree list`. Worktrees of superseded / canceled
+  tickets must be handled too.
+- If the verifier ran through an external CLI that left a long-running background process in
+  a worktree, reclaim it after the worktree is deleted (see `references/verifier.md`).
+- No `git reset --hard`, no force push; confirm remote / branch before pushing.
+- **Pushing needs the user's explicit consent**: merge complete != permission to push. If the
+  user said "do not push, I'll tell you when", that is an iron rule.
 
-## Step 6: 盯部署
+## Step 6: Watch the deploy
 
-Merge 完成不是結束。依專案部署流程執行並盯到底：
-- 部署前確認目標環境（哪個 host／pipeline），不確定就查不要猜
-- CI/CD 專案盯到 pipeline 綠
-- 部署後**遠端驗證**——打實際環境 endpoint／看實際頁面／查 log；本地測試通過不算數
-- 驗證失敗 → **先留現場**（完整 SHA、環境、log、回應、畫面）再查根因；不要先 re-deploy 沖掉現場
+Merge is not the end. Run the project's deploy flow and watch it through:
+- Before deploying, confirm the target environment (which host / pipeline); look it up, do not guess.
+- For CI/CD projects, watch the pipeline until green.
+- After deploying, **verify remotely** — hit the real endpoint, view the real page, read the
+  real logs; passing local tests does not count.
+- Verification fails -> **preserve the scene first** (full SHA, environment, logs, response,
+  screen), then find the root cause. Do not re-deploy first and wash the scene away.
 
-**驗證期間凍結**（部署一啟動就生效到驗證收尾）：完整 SHA＋目標環境寫進 ledger 且不准變；
-期間不得 merge 別的工單、不得 push、不得重新部署。用戶在驗這次部署時同樣適用。
-回報用語：只能說「已部署，遠端驗證了 X、Y」，觀察到什麼說什麼。
+**Freeze during verification** (in effect from the moment deploy starts until verification
+ends): the full SHA and target environment go in the ledger and may not change; during that
+time do not merge other tickets, do not push, do not re-deploy. It applies equally while the
+user is verifying this deploy. Reporting language: say only "deployed, remotely verified X and
+Y" — report what you observed.
 
-## 進度 Ledger（防 compaction 失憶）
+## Progress ledger (against compaction amnesia)
 
-長 session 會被壓縮，光靠記憶會重派已完成的工單（最貴的失敗模式）。
-開工時建立 ledger（放 scratchpad 或 repo 內 git-ignored 路徑），事件追加一行。格式、詞彙、
-三種終態與收工前檢查見 `references/ledger.md`。Compaction 後先讀 ledger + `git log` 再決定下一步，
-相信 ledger，不相信記憶。
+Long sessions get compacted, and memory alone will re-dispatch finished tickets (the most
+expensive failure mode). At the start, create a ledger (in a scratchpad or a git-ignored path
+inside the repo) and append one line per event. Format, vocabulary, the three terminal states
+and the pre-close check are in `references/ledger.md`. After compaction, read the ledger and
+`git log` before deciding the next step; trust the ledger, not memory.
 
-## 紅線
+## Red lines
 
-- 兩張碰同一檔案的工單平行派出
-- Advisor 自己寫實作碼、自己解 merge conflict
-- 派出去就只等回報，超過 10 分鐘沒巡視（「放生」）
-- 沒有完整證據表就開始 review、review 未過就 merge
-- 證據表有列是 FAIL／UNVERIFIED／PENDING 卻放行（除非符合結構相依的具名例外）
-- 派工不指定 model
-- 未經用戶同意就 push
-- 部署後沒做遠端驗證就宣布完成；驗證進行中就 merge／push／重新部署
-- 工單 agent 動了所有權清單外的檔案而 review 沒抓到
-- 多步驟流程沒產流程契約，或契約裡有接縫沒指派 owner；用「不在本工單範圍」推掉接縫
-- 碰到結構障礙自己選擇繞過而沒交給用戶決定
-- 沒親自走完端到端路徑就跟用戶說「可以測了」
-- 同一棵 worktree 同時跑兩個 agent（未 commit 的成果會被沖掉，不可恢復）
-- 收下派工編號不符的回報，或 Agent 呼叫結果不明就直接重派
-- 把「沒回應」當成「已終止」就派 recovery agent 進同一棵 worktree
-- 高風險工單只靠 advisor 自審、跳過獨立 verifier；或讓 verifier 順手改 code
+- Dispatching two tickets that touch the same file in parallel
+- The advisor writing implementation code or resolving merge conflicts itself
+- Dispatching and then only waiting, with no patrol for over 10 minutes ("abandonment"). Without a scheduling tool the cadence becomes "patrol on every interaction", and the user must have been told so (see the prerequisites table)
+- Starting review without a complete evidence table, or merging a ticket whose review failed
+- Merging a ticket with any FAIL / UNVERIFIED row, or any acceptance-item row whose advisor re-check is not PASS (except the named structural-dependency exception)
+- Dispatching without specifying a model
+- Pushing without the user's consent
+- Declaring done without remote verification after deploy; merging / pushing / re-deploying while verification is running
+- A ticket agent touching files outside its ownership list and review not catching it
+- A multi-step flow with no flow contract, or a seam with no owner; dismissing a seam with "out of scope for this ticket"
+- Choosing a workaround for a structural obstacle without handing the trade-off to the user
+- Telling the user "ready to test" without personally walking the end-to-end path
+- Two agents in the same worktree at once (uncommitted work gets overwritten and cannot be recovered)
+- Accepting a report with a mismatched dispatch number, or re-dispatching when the Agent call's outcome is unknown
+- Treating "no response" as "stopped" and sending a recovery agent into the same worktree
+- Relying on advisor self-review alone for a high-risk ticket, skipping the independent verifier; or letting the verifier edit code

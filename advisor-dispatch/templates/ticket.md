@@ -1,39 +1,41 @@
-# 工單範本（貼進 Agent 的 prompt；< > 內是要填的）
+# Ticket template (paste into the Agent prompt; fill in the < >)
 
-派工編號：ticket-<N>#a<K>（回報時原樣帶回）
-預期 base：<完整 SHA>（開工前 `git rev-parse HEAD` 核對，不一致就停下回報）
+Dispatch number: ticket-<N>#a<K> (echo it back unchanged in the report)
+Expected base: <full SHA> (check with `git rev-parse HEAD` before starting; stop and report if it differs)
 
-## 位置
-這張工單是「<專案／功能>」的第 <N> 張，負責 <一句話>。
+## Position
+This is ticket <N> of "<project / feature>", responsible for <one sentence>.
 
-## 目標
-<一句話：做什麼>
+## Goal
+<one sentence: what to do>
 
-## 驗收標準（每條都要可驗證）
-1. <例：POST /x 傳重複 position 回 409；測試 test_xxx 通過>
-2. <例：從 A 頁點返回回到 B 頁並保留篩選條件（手動，環境：…）>
+## Acceptance criteria (each must be verifiable)
+1. <e.g. POST /x with a duplicate position returns 409; test test_xxx passes>
+2. <e.g. from page A, back returns to page B and keeps the filter (manual, environment: ...)>
 
-## 檔案所有權（只准動這些）
+## File ownership (you may touch only these)
 - <path/or/dir>
 
-## 測試要求
-- 跑：<完整指令>
-- 新增：<要新增的測試與覆蓋的行為>
+## Test requirements
+- Run: <full command>
+- Add: <tests to add and the behavior they cover>
 
-## 不做什麼
-- <明確排除的範圍外項目>
+## Out of scope
+- <explicitly excluded items>
 
-## 工作規則
-- 你在獨立 worktree 工作，只准動所有權清單內的檔案；需要動清單外檔案就停下回報。
-- 依賴自己在 worktree 內安裝，不准 symlink 主 repo 的 node_modules／.venv；回報前跑
-  `find . -maxdepth 2 -type l \( -name node_modules -o -name .venv \)`，必須無輸出。
-- 完成後 commit 到你的 branch（<專案 commit 慣例>），不要 push、不要 merge。
+## Working rules
+- You work in an isolated worktree and may only touch files in the ownership list; if you need
+  to touch anything else, stop and report.
+- Install dependencies inside the worktree; never symlink the main repo's node_modules / .venv.
+  Before reporting run `find . -maxdepth 2 -type l \( -name node_modules -o -name .venv \)`;
+  it must print nothing.
+- When done, commit to your branch (<project commit convention>); do not push, do not merge.
 
-## 回報格式
+## Report format
 status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 ticket: ticket-<N>#a<K>
-worktree: <絕對路徑>
-branch: <branch 名>
+worktree: <absolute path>
+branch: <branch name>
 commits: <hashes>
-驗收證據表: <依 evidence-table 格式，一條驗收標準一列，含「已知弱點」列>
-疑慮: <有就寫>
+evidence table: <per references/evidence-table.md, one row per acceptance criterion, including a "Known weaknesses" row>
+concerns: <if any>

@@ -1,35 +1,39 @@
-# 進度 Ledger
+# Progress ledger
 
-放 scratchpad 或 repo 內 git-ignored 路徑，每個事件追加一行：
+Keep it in a scratchpad or a git-ignored path inside the repo; append one line per event:
 
 ```
 ticket-1#a1 dispatching
-ticket-1#a1 dispatched (model=<model>, worktree=<path>, base=<完整 SHA>)
-ticket-1 question q1: <一句摘要>
+ticket-1#a1 dispatched (model=<model>, worktree=<path>, base=<full SHA>)
+ticket-1 question q1: <one-line summary>
 ticket-1 q1 answered
 ticket-1#a1 nudge #1
-ticket-1 review round 1: FAIL (<原因>)
+ticket-1 review round 1: FAIL (<reason>)
 ticket-1 review round 2: PASS
-ticket-1 merged (<完整 SHA>); worktree removed
-ticket-2#a1 superseded by ticket-2#a2 (<model>): <原因>; a1 agent 已終止, worktree 交給 a2 沿用
-ticket-3 canceled: <原因>; worktree removed, branch deleted
-decision: <議題> → <選擇>（<日期>，<誰決定>）
+ticket-1 merged (<full SHA>); worktree removed
+ticket-2#a1 superseded by ticket-2#a2 (<model>): <reason>; a1 agent stopped, worktree handed to a2
+ticket-3 canceled: <reason>; worktree removed, branch deleted
+decision: <topic> -> <choice> (<date>, <who decided>)
 deploy: verified on <env> at <endpoint>
 ```
 
-過程事件只用這些詞：`dispatching`、`dispatched`、`nudge #k`、`unverifiable`、`stale report ignored`、
-`question qM: <摘要>`、`qM answered`、`decision: <議題> → <選擇>`、`review round N: PASS|FAIL`、
-`blocked (on <具名對象>)`。
+Process events use only these words: `dispatching`, `dispatched`, `nudge #k`, `unverifiable`,
+`stale report ignored`, `question qM: <summary>`, `qM answered`, `decision: <topic> -> <choice>`,
+`review round N: PASS|FAIL`, `blocked (on <named party>)`.
 
-**工單只有三種終態，每一種都必須帶原因或去向，並寫明 agent 與 worktree 怎麼處置，沒帶就不算收尾：**
+**A ticket has exactly three terminal states. Each must carry a reason or destination and say
+what happens to its agent and worktree; without that it is not closed:**
 
-- `merged (<完整 SHA>)`
-- `superseded by <新工單或新編號>: <原因>`（退回重派、換 model 重派、被拆單取代）。
-  舊 agent 必須已終止；worktree 寫明是交給新的那次沿用，還是已移除
-- `canceled: <原因>`（advisor 自行取消時在原因寫明並當場告知用戶）。worktree 與 branch 一併清掉；
-  有要保留的成果就寫明保留在哪
+- `merged (<full SHA>)`
+- `superseded by <new ticket or number>: <reason>` (sent back and re-dispatched, re-dispatched
+  with another model, replaced by a split). The old agent must have stopped; say whether the
+  worktree is handed to the new attempt or removed.
+- `canceled: <reason>` (when the advisor cancels on its own, state the reason and tell the user
+  on the spot). Remove the worktree and branch together; if work is kept, say where.
 
-**收工前檢查**：`git worktree list` 的每一棵都要對應到 ledger 裡還在進行、或終態寫明「沿用／保留」的工單，
-對不上的就是殭屍；還沒記 `answered` 的 question 必須是零。
+**Pre-close check**: every worktree in `git worktree list` must map to a ticket that is still in
+progress, or whose terminal state says "reuse / keep"; anything unmatched is a zombie. The
+number of questions without an `answered` line must be zero.
 
-Compaction 後掃 ledger，任何沒有終態行的工單都要查明現況，不得當作已完成或已放棄。
+After compaction, scan the ledger: any ticket with no terminal line must be investigated; never
+assume it is finished or abandoned.

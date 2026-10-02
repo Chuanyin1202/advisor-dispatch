@@ -1,30 +1,38 @@
-# 驗收證據表（implementer 的交付格式）
+# Acceptance evidence table (the implementer's delivery format)
 
-一條驗收標準一列，不得合併或省略：
+One row per acceptance criterion; rows may not be merged or omitted:
 
-| 驗收項 | 驗證方式 | 可重現證據 | implementer 判定 | advisor 複驗 |
+| Acceptance item | How verified | Reproducible evidence | Implementer verdict | Advisor re-check |
 |---|---|---|---|---|
-| <驗收標準原文> | <完整指令，或明確的手動步驟＋環境> | <退出碼、關鍵輸出、實際觀察；長 log 附路徑> | PASS / FAIL / UNVERIFIED | PENDING / PASS / FAIL / UNVERIFIED |
+| <acceptance criterion, verbatim> | <full command, or explicit manual steps + environment> | <exit code, key output, what was actually observed; path for long logs> | PASS / FAIL / UNVERIFIED | PENDING / PASS / FAIL / UNVERIFIED |
 
-必有一列「已知弱點」（沒有就寫「無」）。
+There must be a "Known weaknesses" row (write "none" if there are none).
 
-## 規則
+## Rules
 
-- 自動驗證要有**完整指令 + 退出碼 + 足以判讀行為的輸出**。只貼 `1 passed` 而看不出測到哪個行為，不算證據。
-- **不能用指令驗證 ≠ 不能驗證**。UI、動畫、返回路徑、實機權限用手動驗證，但必須寫明環境、操作路徑、
-  預期結果、實際觀察。「我確認過了」和單張截圖不算。
-- 真的沒有可行驗證方式，或環境缺相依／憑證／服務跑不起來 → 標 **UNVERIFIED 並寫原因**，不准猜、不准改填 PASS。
-- **任一列是 FAIL／UNVERIFIED／PENDING，整張工單不得判通過、不得 merge。**
+- Automated verification needs the **full command + exit code + enough output to tell which
+  behavior was tested**. Pasting only `1 passed` where you cannot see what behavior was tested
+  is not evidence.
+- **Cannot verify by command != cannot verify.** UI, animation, back paths and on-device
+  permissions are verified by hand, but you must state the environment, the steps, the
+  expected result and the actual observation. "I checked it" and a single screenshot do not count.
+- If there is truly no feasible way to verify, or the environment lacks a dependency /
+  credential / running service, mark **UNVERIFIED and state why**. Never guess, never fill in PASS.
+- **If any row has an implementer verdict of FAIL / UNVERIFIED, the ticket goes back at the evidence gate. The "Advisor re-check" column starts as PENDING and is filled by the advisor during review; at merge time the cell of every acceptance-item row must be PASS (the "Known weaknesses" row has no re-check), otherwise the ticket may not be merged.**
 
-## 唯一例外：結構相依
+## The only exception: structural dependency
 
-該驗收行為必須等某張**具名工單**合併後才存在，merge 前根本無從執行。
-缺相依套件、缺憑證、服務沒起、手邊沒裝置、操作麻煩、沒時間，**都不算**，一律維持 UNVERIFIED 擋住 merge。
+The behavior under test can exist only after a **named ticket** is merged, so before that merge
+it simply cannot be run. A missing package, missing credential, service not up, no device at
+hand, inconvenience or lack of time are **all not** structural dependencies; they stay
+UNVERIFIED and block the merge.
 
-啟用例外時 advisor 逐項記進 ledger：① 結構原因 ② 必須先合併哪張具名工單
-③ merge 後的驗證環境、步驟、預期結果，並**當場告知用戶**。
+When the exception is used, the advisor records in the ledger, per item: (1) the structural
+reason, (2) which named ticket must be merged first, (3) the verification environment, steps
+and expected result after the merge — and **tells the user on the spot**.
 
-- 只准合併「形成該驗證條件所必要」的工單
-- 補驗完成前**不得 push、不得部署、不得宣告通過**，也不得繼續合併無關工單
-- 補驗失敗 → 該項改 FAIL，回修正迴圈
-- 例外逐項具名，不准整張表套用
+- Merge only the tickets *necessary to create that verification condition*.
+- Until the follow-up check is done: **no push, no deploy, no declaring it passed**, and no
+  merging unrelated tickets.
+- If the follow-up check fails, that item becomes FAIL and the fix loop resumes.
+- The exception is granted item by item, by name; never apply it to a whole table.
