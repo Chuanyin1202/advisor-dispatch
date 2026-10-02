@@ -89,7 +89,7 @@ flowchart TD
 
 ## 安裝
 
-**A. 複製到 skills 目錄（建議）**
+**A. 複製到 skills 目錄**
 
 ```bash
 # 個人全域
@@ -108,9 +108,19 @@ skill 就是一個含 `SKILL.md` 的資料夾：不需要 manifest 或 marketpla
 /plugin install advisor-dispatch@advisor-dispatch
 ```
 
-`claude plugin validate` 對 plugin manifest、marketplace manifest 與 skill 都通過，
-並且已用本機 checkout 在乾淨的 Claude Code config 目錄裡安裝成功。**未測試**：
-在互動 session 裡從 GitHub 來源安裝，以及從 plugin 安裝後觸發 skill。
+已測試：`claude plugin validate` 對 plugin manifest、marketplace manifest 與 skill 都通過，
+並且已用本機 checkout 在乾淨的 Claude Code config 目錄裡安裝成功。
+**未測試**：`owner/repo` 的 GitHub 來源形式，以及從 plugin 安裝後觸發 skill。
+
+**C. `npx skills`（一行指令，支援它列出的各種 agent）**
+
+```bash
+npx skills add Chuanyin1202/advisor-dispatch -a claude-code -s advisor-dispatch
+```
+
+已用 `skills@1.7.0`（[vercel-labs/skills](https://github.com/vercel-labs/skills)，MIT）測試：
+從本機 git clone 安裝到專案，複製出 6 個 skill 檔案，與本 repo 內容逐位元相同。
+**未測試**：GitHub 來源形式，以及其他 agent。該工具的說明文字提到安裝遙測，在意的話請查它的文件。
 
 ---
 
@@ -170,7 +180,7 @@ ticket-2 merged (8b7a54eb7039f1e7ed4e1a8d00d99709d174c47e); full suite 8 tests O
 **未來工作**
 
 1. 在真實的多工單任務上跑修正迴圈、巡視與 verifier。
-2. 測試從 GitHub 來源安裝 plugin，以及 plugin 安裝後 skill 的觸發。
+2. 測試 GitHub 來源的 plugin 與 `npx skills` 安裝，以及 plugin 安裝後 skill 的觸發。
 3. 用選用的 hook 強制最便宜的紅線（未經同意不得 push）。
 
 ---

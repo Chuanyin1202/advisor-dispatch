@@ -99,7 +99,7 @@ The full table is at the top of `SKILL.md`.
 
 ## Install
 
-**A. Copy into a skills directory (recommended)**
+**A. Copy into a skills directory**
 
 ```bash
 # personal, all projects
@@ -119,10 +119,20 @@ the skill is triggered by its description, for example "dispatch this work".
 /plugin install advisor-dispatch@advisor-dispatch
 ```
 
-`claude plugin validate` passes for the plugin manifest, the marketplace manifest and the skill, and
-installing from a local checkout into a clean Claude Code config directory succeeded. Not tested:
-installing from the GitHub source in an interactive session, and triggering the skill from a
-plugin install.
+Tested: `claude plugin validate` passes for the plugin manifest, the marketplace manifest and the
+skill, and installing from a local checkout into a clean Claude Code config directory succeeded.
+Not tested: the `owner/repo` GitHub source form, and triggering the skill from a plugin install.
+
+**C. `npx skills` (one command, any agent it supports)**
+
+```bash
+npx skills add Chuanyin1202/advisor-dispatch -a claude-code -s advisor-dispatch
+```
+
+Tested with `skills@1.7.0` ([vercel-labs/skills](https://github.com/vercel-labs/skills), MIT):
+installing from a local git clone into a project copied the six skill files, byte-identical to
+this repository. Not tested: the GitHub source form, and other agents. The tool's help text
+mentions install telemetry; check its documentation if that matters to you.
 
 ---
 
@@ -189,7 +199,7 @@ internal contradictions); both rounds' findings were fixed.
 **Future work**
 
 1. Run the fix loop, the patrol and the verifier on a real multi-ticket task.
-2. Test the GitHub-source plugin install and the skill trigger from a plugin install.
+2. Test the GitHub-source plugin and `npx skills` installs, and the skill trigger from a plugin install.
 3. Optional hooks that enforce the cheapest red lines (no push without consent).
 
 ---
