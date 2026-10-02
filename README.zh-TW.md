@@ -1,9 +1,9 @@
 # advisor-dispatch — Claude Code 的派工／監工開發流程
 
-> 一個 session 負責規劃與審查，subagent 各自在獨立的 git worktree 裡實作。沒有證據就不能 merge。
+> 一個 advisor 視窗。多個 subagent，各自有獨立 context、獨立 git worktree，並且每張工單可以選不同模型。沒有證據就不能 merge。
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-v1.2.0-informational)](#)
+[![version](https://img.shields.io/badge/version-v1.3.0-informational)](#)
 
 - English：[README.md](README.md)
 - 核心流程（Claude Code 實際載入的檔案）：[`skills/advisor-dispatch/SKILL.md`](skills/advisor-dispatch/SKILL.md)
@@ -28,6 +28,20 @@ subagent 進獨立 worktree、檢查每張單的證據表、親自看每一份 d
 ---
 
 ## 核心功能
+
+**你實際面對的**
+
+- **只有一個視窗。** 你只跟一個 advisor session 對話；它負責拆單、派工、review 與回報，
+  你不需要自己管理各個 subagent。
+- **每個 subagent 有獨立 context。** 工單 prompt 只帶該張工單、會碰到的介面與全域約束，
+  不貼 session 歷史；advisor 的 context 留給協調與審查。
+- **每個 subagent 有獨立 worktree。** 一張工單一個 worktree、一個 branch，advisor 不在裡面改 code。
+- **每張工單可選模型。** advisor 每次派工都明確指定 `model`，同一次執行可以混用檔位：
+  機械式修改用較輕的、一般工作用預設、高風險或規格模糊的用較強的。升級依據是證據
+  （`BLOCKED`，或同一個 finding 退回兩次）。ledger 會記錄每張工單的模型、檔位與 review 輪數，
+  方便你比較各種選擇換來多少次退回；skill 本身不彙整，也不記錄 token 成本。
+
+**讓平行執行不出事的機制**
 
 - **檔案所有權切割**：同一批平行工單中，一個檔案只屬於一張單；必須共用檔案的工單改串行。
   worktree 只防工作樹互踩，防不了 merge conflict，所有權才防得了。

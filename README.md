@@ -1,9 +1,9 @@
 # advisor-dispatch — an advisor/dispatch workflow for Claude Code
 
-> One session plans and reviews. Subagents build, each in its own git worktree. Nothing merges without evidence.
+> One advisor window. Many subagents, each with its own context, its own git worktree and a model you choose per ticket. Nothing merges without evidence.
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-v1.2.0-informational)](#)
+[![version](https://img.shields.io/badge/version-v1.3.0-informational)](#)
 
 - 繁體中文版：[README.zh-TW.md](README.zh-TW.md)
 - Core flow (what Claude Code loads): [`skills/advisor-dispatch/SKILL.md`](skills/advisor-dispatch/SKILL.md)
@@ -32,6 +32,24 @@ It never writes implementation code.
 ---
 
 ## Core features
+
+**What you work with**
+
+- **One window.** You talk to a single advisor session. It splits the work, dispatches, reviews
+  and reports back; you do not manage the subagents yourself.
+- **An independent context per subagent.** A ticket prompt carries only that ticket, the
+  interfaces it touches and the global constraints, never the session history. The advisor's
+  context stays free for coordination and review.
+- **An isolated worktree per subagent.** One ticket, one worktree, one branch; the advisor
+  never edits code in them.
+- **A model per ticket.** The advisor sets `model` explicitly on every dispatch, so you can mix
+  levels in one run: lighter for mechanical edits, the default for ordinary work, stronger for
+  high-risk or vague tickets. Escalation happens on evidence (`BLOCKED`, or the same finding sent
+  back twice). The ledger records the model, level and review rounds of every ticket, so you can
+  compare what each choice cost in send-backs. The skill does not aggregate that and does not
+  record token cost.
+
+**What keeps it safe to run in parallel**
 
 - **File-ownership partitioning.** A file belongs to exactly one ticket in a parallel batch;
   tickets that must share a file run in series. Worktrees stop working trees from colliding,
