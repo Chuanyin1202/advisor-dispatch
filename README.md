@@ -1,6 +1,6 @@
 # advisor-dispatch — an advisor/dispatch workflow for Claude Code
 
-> One advisor window. Many subagents, each with its own context, its own git worktree and a model you choose per ticket. Nothing merges without evidence.
+> One advisor window. Implementer subagents, each with its own context, its own git worktree and a model you choose per ticket. Nothing merges without evidence.
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![version](https://img.shields.io/badge/version-v1.3.0-informational)](#)

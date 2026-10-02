@@ -61,9 +61,10 @@ Rules around the table:
   same finding sent back twice and still not fixed (Step 4; the alternative there is to stop and ask
   the user). Escalating means re-dispatching with a stronger level and a changed prompt, never the
   same prompt again.
-- **If there is no stronger level to move to** (the default is already the strongest available, or
-  the ticket is already on it), do not re-dispatch the same thing: split the ticket, supply the
-  missing context, or stop and tell the user.
+- **If the ticket is already on the strongest available level**, escalation is not possible and
+  re-dispatching the same thing is not allowed. Take the matching alternative from Steps 2 and 4
+  instead: supply the missing context (`BLOCKED` for lack of context), split the ticket (too big),
+  or stop and ask the user (repeated findings, or the task is simply too hard).
 - **Never go below the level the user asked for**, and never pick the verifier's level lower than
   the implementer's.
 - The table is a starting point, not a measured threshold. If the project has its own

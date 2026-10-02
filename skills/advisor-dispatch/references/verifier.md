@@ -13,8 +13,8 @@ multi-file core logic. Dispatch it after the advisor's own review has passed.
 2. External CLI unavailable -> verifier = a fresh subagent **at the advisor's level**.
 3. Hard floor: whichever path, the verifier's level is **>= the implementer's**. If the implementer
    was chosen above the advisor's level, set the verifier's `model` explicitly to at least the
-   implementer's level; if no such model is available, say so and ask the user before relying on a
-   weaker verifier.
+   implementer's level. If no such model is available, do not dispatch a weaker verifier: stop and
+   tell the user (only the user may waive the floor).
 
 ```
 Agent({
