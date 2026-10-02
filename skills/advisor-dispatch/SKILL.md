@@ -48,7 +48,7 @@ Think in three levels, not model names; map each level to whatever models are av
 
 | Ticket | Level |
 |---|---|
-| The user named a model for it | that model, no further judgment |
+| The user named a model for it | that model for the implementer, no level judgment (the high-risk row still adds a verifier) |
 | Low risk and mechanical: copy changes, config, a single-file edit with an obvious fix | lighter than the default |
 | Ordinary implementation | the default (mid-tier) |
 | High risk: security / permissions / money, concurrency, data migration, multi-file core logic (same definition as in Step 3) | stronger than the default, **and** an independent verifier |
@@ -57,9 +57,13 @@ Think in three levels, not model names; map each level to whatever models are av
 Rules around the table:
 - **Cost is not a reason to drop a level on a high-risk ticket.** A cheaper model that needs two
   send-backs usually costs more than a stronger one that passes first time.
-- **Escalate on evidence, not on feeling:** `BLOCKED` because the task is too hard, or the same
-  finding sent back twice (Step 4). Escalating means re-dispatching with a stronger level and a
-  changed prompt, never the same prompt again.
+- **Escalate on evidence, not on feeling:** `BLOCKED` because the task is too hard (Step 2), or the
+  same finding sent back twice and still not fixed (Step 4; the alternative there is to stop and ask
+  the user). Escalating means re-dispatching with a stronger level and a changed prompt, never the
+  same prompt again.
+- **If there is no stronger level to move to** (the default is already the strongest available, or
+  the ticket is already on it), do not re-dispatch the same thing: split the ticket, supply the
+  missing context, or stop and tell the user.
 - **Never go below the level the user asked for**, and never pick the verifier's level lower than
   the implementer's.
 - The table is a starting point, not a measured threshold. If the project has its own

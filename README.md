@@ -38,14 +38,15 @@ It never writes implementation code.
 - **One window.** You talk to a single advisor session. It splits the work, dispatches, reviews
   and reports back; you do not manage the subagents yourself.
 - **An independent context per subagent.** A ticket prompt carries only that ticket, the
-  interfaces it touches and the global constraints, never the session history. The advisor's
+  interfaces it touches and the global constraints, not the whole session history. The advisor's
   context stays free for coordination and review.
-- **An isolated worktree per subagent.** One ticket, one worktree, one branch; the advisor
-  never edits code in them.
+- **An isolated worktree per implementer.** One ticket, one worktree, one branch; the advisor
+  never edits code in them. (A recovery agent can be put back into an existing worktree; the
+  independent verifier reads the repo read-only.)
 - **A model per ticket.** The advisor sets `model` explicitly on every dispatch, so you can mix
-  levels in one run: lighter for mechanical edits, the default for ordinary work, stronger for
-  high-risk or vague tickets. Escalation happens on evidence (`BLOCKED`, or the same finding sent
-  back twice). The ledger records the model, level and review rounds of every ticket, so you can
+  levels in one run: lighter for low-risk mechanical edits, the default for ordinary work, stronger for
+  high-risk or vague tickets. Escalation happens on evidence (`BLOCKED` because the task is too hard, or the same finding
+  sent back twice and still not fixed). The ledger records the model, level and review rounds of every ticket, so you can
   compare what each choice cost in send-backs. The skill does not aggregate that and does not
   record token cost.
 

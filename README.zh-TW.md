@@ -34,11 +34,12 @@ subagent 進獨立 worktree、檢查每張單的證據表、親自看每一份 d
 - **只有一個視窗。** 你只跟一個 advisor session 對話；它負責拆單、派工、review 與回報，
   你不需要自己管理各個 subagent。
 - **每個 subagent 有獨立 context。** 工單 prompt 只帶該張工單、會碰到的介面與全域約束，
-  不貼 session 歷史；advisor 的 context 留給協調與審查。
-- **每個 subagent 有獨立 worktree。** 一張工單一個 worktree、一個 branch，advisor 不在裡面改 code。
+  不貼完整的 session 歷史；advisor 的 context 留給協調與審查。
+- **每個 implementer 有獨立 worktree。** 一張工單一個 worktree、一個 branch，advisor 不在裡面改 code。
+  （recovery agent 可以回到既有的 worktree；獨立 verifier 以唯讀方式看 repo。）
 - **每張工單可選模型。** advisor 每次派工都明確指定 `model`，同一次執行可以混用檔位：
-  機械式修改用較輕的、一般工作用預設、高風險或規格模糊的用較強的。升級依據是證據
-  （`BLOCKED`，或同一個 finding 退回兩次）。ledger 會記錄每張工單的模型、檔位與 review 輪數，
+  低風險的機械式修改用較輕的、一般工作用預設、高風險或規格模糊的用較強的。升級依據是證據
+  （`BLOCKED` 且任務太難，或同一個 finding 退回兩次仍未修好）。ledger 會記錄每張工單的模型、檔位與 review 輪數，
   方便你比較各種選擇換來多少次退回；skill 本身不彙整，也不記錄 token 成本。
 
 **讓平行執行不出事的機制**

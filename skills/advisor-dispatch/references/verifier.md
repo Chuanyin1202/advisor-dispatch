@@ -11,7 +11,10 @@ multi-file core logic. Dispatch it after the advisor's own review has passed.
    in or has quota — **run one minimal command** to confirm it responds; on failure, go to
    step 2. This is an optional module; without it, go straight to step 2.
 2. External CLI unavailable -> verifier = a fresh subagent **at the advisor's level**.
-3. Hard floor: whichever path, the verifier's level is **>= the implementer's**.
+3. Hard floor: whichever path, the verifier's level is **>= the implementer's**. If the implementer
+   was chosen above the advisor's level, set the verifier's `model` explicitly to at least the
+   implementer's level; if no such model is available, say so and ask the user before relying on a
+   weaker verifier.
 
 ```
 Agent({
