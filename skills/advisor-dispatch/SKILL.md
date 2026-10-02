@@ -149,6 +149,10 @@ Before calling Agent, record the **full** base of the target integration branch:
 - Put the expected base in the ticket prompt; the implementer must check it before starting
   and stop and report if it differs.
 - Step 3 always diffs against the full base in the ledger; never back-fill it later.
+- Before calling Agent, save the output of `git worktree list` and of the main checkout's
+  `git status --short` to a file (scratchpad) and record its path in the ledger. It is the baseline
+  for finding the worktree a dispatch created (the new entry) and for checking that nothing leaked
+  into the main checkout.
 - **Every dispatch has its own number** `ticket-N#aK` (K increments; a re-dispatch, a model
   change or a recovery each counts as a new one). Put it in the ticket prompt and require
   the report to echo it back unchanged.
@@ -170,15 +174,20 @@ Agent({
 
 Dispatch a parallel batch **in the same message**.
 
-**Recovery / follow-up agent in an existing worktree.** `isolation: "worktree"` always creates a
+**Recovery / follow-up agent in an existing worktree** (only after the original agent is confirmed
+stopped, see "Handling reports" (1); if it may still be alive, do not dispatch). `isolation: "worktree"` always creates a
 *new* worktree; the Agent tool's schema has no parameter to reuse an existing one. To put a
 recovery or follow-up agent into the current worktree, dispatch it **without** `isolation` and
 put in its prompt: the absolute worktree path, the branch name, the expected base, and the rule
 "work only inside this path (use `git -C <path>` and absolute paths; never edit the main
 checkout)". At review, confirm via `git -C <worktree> status --short` and `git diff <base>..HEAD`
-that the changes landed in the worktree and nothing leaked into the main checkout. Alternative (uses only supported behavior): once the old agent has stopped and its work is
+that the changes landed in the worktree, and run `git -C <main-repo> status --short` and compare it
+with the file saved before dispatch: no unexpected changes. Alternative (uses only supported
+behavior; not usable when the worktree has uncommitted changes, because a merge does not carry
+them over; in that case only the route above remains): once the old agent has stopped and its work is
 committed, dispatch the recovery agent with its own fresh `isolation: "worktree"` and tell it to
-first `git merge <old-branch>` (or cherry-pick the listed commits); then retire the old worktree.
+first `git merge <old-branch>` (or cherry-pick the listed commits); then the advisor retires the old
+worktree once nothing unreviewed is left in it. If neither route is workable, stop and ask the user.
 Untested: the "no isolation, work by path" route relies on the agent obeying the path rule, so
 the leak check above is mandatory.
 
@@ -192,7 +201,9 @@ The ticket prompt must contain (this is the implementer's contract):
 5. Report format: `status` (DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED) + dispatch
    number + absolute worktree path + branch name + commit hashes + acceptance evidence table
    + concerns. The Agent call does not return the worktree path and its location is chosen by the
-   tool, not by you: record `worktree=pending` at dispatch and fill in the path from the report.
+   tool, not by you: record `worktree=pending` at dispatch, and append `worktree=<path>` as soon as the
+   report, a patrol or a recovery finds it (new entry in `git worktree list` versus the file saved
+   before dispatch).
 6. "Do not symlink the main repo's dependency directories (`node_modules`, `.venv`, ...) into
    the worktree; install inside the worktree. A symlink makes type checks and tests read the
    main tree's code and exit 0 without verifying your change. Before reporting, run
@@ -225,7 +236,8 @@ row has an implementer verdict of FAIL / UNVERIFIED, or an acceptance-item row w
   (1) First confirm whether the agent has really stopped. If it is alive, wait or stop it —
   **never** let a second agent into the same worktree (uncommitted work gets overwritten and
   cannot be recovered).
-  (2) Reconstruct the state from `git worktree list`, the branch name and the ledger's base:
+  (2) Reconstruct the state from `git worktree list` (new entry versus the pre-dispatch file; record
+  `worktree=<path>` once found) and the ledger's base:
   `git status --short`, `git log <base>..HEAD`, `git diff <base>..HEAD`, uncommitted changes,
   any edits outside the ownership list.
   (3) If there is usable work, after confirming the original agent has stopped, dispatch a
@@ -238,16 +250,22 @@ row has an implementer verdict of FAIL / UNVERIFIED, or an acceptance-item row w
 Never assume an agent will report. If the advisor just waits, the user sees "abandoned".
 - **Patrol every ~10 minutes**; when there is no message to wait on, schedule a wake-up
   (see the prerequisites table).
-- **Judge state by facts, not self-report.** Each round, per ticket, take
+- **Judge state by facts, not self-report.** For a ticket whose ledger entry is still
+  `worktree=pending`, first find its worktree (new entry in `git worktree list` versus the
+  pre-dispatch file) and record `worktree=<path>`; not finding one counts as evidence for
+  unclaimed. Each round, per ticket, take
   `git -C <worktree> log --oneline <base>..HEAD | wc -l` and `git -C <worktree> status --short`
   and compare with the previous round: changed -> working, leave it alone; unchanged and the
   agent is idle -> stalled; more than 3 minutes since dispatch with no commit and no
   uncommitted change -> unclaimed (confirm it is alive, then send a nudge that only points at
-  the ticket).
+  the ticket; it counts toward the "two nudges" below). If it has stopped and neither a worktree nor a
+  commit can be found, go to "No report / null" (2)-(3): after confirming there is no work,
+  re-dispatch from the original base under `aK+1` and record the old one as
+  `superseded ... worktree=none`.
 - **Idle with no final report**: (1) look at the worktree and result files first; if there is
-  usable work, inspect it, then ask the agent for its full report and evidence table — the ticket is not reviewed or passed until both arrive (a commit is not a report); (2) otherwise nudge — first line says "you have been idle N
+  usable work, inspect it, then ask the agent for its full report and evidence table — the ticket is not reviewed or passed until both arrive (a commit is not a report); this request counts as a nudge (record `ticket-N#aK nudge #k`, first line "missing: full report and evidence table") and is counted by (3); (2) otherwise nudge — first line says "you have been idle N
   minutes, here is what I am missing", **do not repaste the ticket** (it will be treated as a
-  new ticket), and record `nudge #k` in the ledger; (3) two nudges with no movement -> record
+  new ticket), and record `ticket-N#aK nudge #k` in the ledger; (3) two nudges with no movement -> record
   `unverifiable` and tell the user. No response is not the same as stopped: if you cannot
   confirm it stopped, keep patrolling and never send a second agent into the same worktree.
 - **Truncated report** -> immediately ask for just the missing part.

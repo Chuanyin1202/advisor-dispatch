@@ -5,7 +5,7 @@ Keep it in a scratchpad or a path git ignores (if the repo has no suitable `.git
 ```
 ticket-1#a1 dispatching
 ticket-1#a1 dispatched (model=<model>, level=<lighter|default|stronger>, worktree=pending, base=<full SHA>)
-ticket-1#a1 worktree=<path> (filled in from the report)
+ticket-1#a1 worktree=<path> (filled in from the report, a patrol or a recovery)
 ticket-1 question q1: <one-line summary>
 ticket-1 q1 answered
 ticket-1#a1 nudge #1
@@ -13,6 +13,7 @@ ticket-1 review round 1: FAIL (<reason>)
 ticket-1 review round 2: PASS
 ticket-1 merged (<full SHA>); worktree removed
 ticket-2#a1 superseded by ticket-2#a2 (<model>): <reason>; a1 agent stopped, worktree handed to a2
+ticket-4#a1 superseded by ticket-4#a2: agent stopped before any worktree or commit existed; worktree=none
 ticket-3 canceled: <reason>; worktree removed, branch deleted
 decision: <topic> -> <choice> (<date>, <who decided>)
 deploy: verified on <env> at <endpoint>

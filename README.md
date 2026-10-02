@@ -3,7 +3,7 @@
 > One advisor window. Implementer subagents, each with its own context, its own git worktree and a model you choose per ticket. Nothing merges without evidence.
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-v1.3.0-informational)](#)
+[![version](https://img.shields.io/badge/version-v1.3.1-informational)](#)
 
 - 繁體中文版：[README.zh-TW.md](README.zh-TW.md)
 - Core flow (what Claude Code loads): [`skills/advisor-dispatch/SKILL.md`](skills/advisor-dispatch/SKILL.md)

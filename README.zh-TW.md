@@ -3,7 +3,7 @@
 > 一個 advisor 視窗。多個 implementer subagent，各自有獨立 context、獨立 git worktree，並且每張工單可以選不同模型。沒有證據就不能 merge。
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version](https://img.shields.io/badge/version-v1.3.0-informational)](#)
+[![version](https://img.shields.io/badge/version-v1.3.1-informational)](#)
 
 - English：[README.md](README.md)
 - 核心流程（Claude Code 實際載入的檔案）：[`skills/advisor-dispatch/SKILL.md`](skills/advisor-dispatch/SKILL.md)
